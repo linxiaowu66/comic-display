@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint ."
   },
+  "projectSettings": {
+    "framework": "nextjs"
+  },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@vercel/analytics": "1.6.1",
