@@ -1,7 +1,10 @@
 import fs from "fs";
 import path from "path";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL
+  ? path.join("/tmp", "comic-display-data")
+  : path.join(process.cwd(), "data");
 
 function ensureDir(dir: string) {
   if (!fs.existsSync(dir)) {
