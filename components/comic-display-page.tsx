@@ -354,7 +354,10 @@ function StoryboardList() {
               <div className="p-5 flex flex-col gap-4 bg-muted/5">
                 {item.videoPrompt && (
                   <div className="text-sm text-foreground/80 leading-relaxed border-l-2 border-primary/30 pl-3 py-1">
-                    {item.videoPrompt}
+                    <CharacterMention
+                      html={item.videoPrompt}
+                      characterMap={characterMap}
+                    />
                   </div>
                 )}
                 <div className="flex-1 flex items-center justify-center">
