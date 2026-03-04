@@ -6,7 +6,7 @@ import {
 } from "@/lib/server-storage";
 
 export async function GET() {
-  const projects = getSharedProjects();
+  const projects = await getSharedProjects();
   return NextResponse.json({ projects });
 }
 
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    addSharedProject({ id, name, projectId });
+    await addSharedProject({ id, name, projectId });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Share error:", error);
@@ -46,7 +46,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    removeSharedProject(Number(projectId));
+    await removeSharedProject(Number(projectId));
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Unshare error:", error);

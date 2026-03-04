@@ -19,11 +19,11 @@ export async function GET(request: NextRequest) {
 
   switch (type) {
     case "series":
-      return NextResponse.json({ data: getCachedSeries(id) });
+      return NextResponse.json({ data: await getCachedSeries(id) });
     case "characters":
-      return NextResponse.json({ data: getCachedCharacters(id) });
+      return NextResponse.json({ data: await getCachedCharacters(id) });
     case "storyboard":
-      return NextResponse.json({ data: getCachedStoryboard(id) });
+      return NextResponse.json({ data: await getCachedStoryboard(id) });
     default:
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
@@ -47,13 +47,13 @@ export async function POST(request: NextRequest) {
 
     switch (type) {
       case "series":
-        cacheSeries(id, data);
+        await cacheSeries(id, data);
         break;
       case "characters":
-        cacheCharacters(id, data);
+        await cacheCharacters(id, data);
         break;
       case "storyboard":
-        cacheStoryboard(id, data);
+        await cacheStoryboard(id, data);
         break;
       default:
         return NextResponse.json({ error: "Invalid type" }, { status: 400 });
