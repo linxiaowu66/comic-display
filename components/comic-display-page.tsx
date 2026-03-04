@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ProjectProvider, useProject } from "@/lib/project-context";
 import { TopBar } from "@/components/top-bar";
 import { apiFetcher } from "@/lib/api";
@@ -55,28 +55,55 @@ interface StoryboardResponse {
 }
 
 function StoryboardList() {
-  const { selectedSeries, currentProject, availableProjects } = useProject();
+  const { selectedSeries, currentProject, availableProjects, isAdmin } = useProject();
   const [previewImage, setPreviewImage] = useState<{
     src: string;
     alt: string;
   } | null>(null);
-  const { data: storyboardData, isLoading } = useSWR<StoryboardResponse>(
+
+  // Admin: fetch from upstream API; Non-admin: fetch from server cache
+  const { data: storyboardData, isLoading } = useSWR<
+    StoryboardResponse | { data: StoryboardItem[] }
+  >(
     selectedSeries && currentProject
-      ? [
-          "/storyboard/api/list",
-          currentProject.token,
-          {
-            method: "POST" as const,
-            params: {
-              seriesId: selectedSeries.id,
-              page: 1,
-              size: 500,
+      ? isAdmin
+        ? [
+            "/storyboard/api/list",
+            currentProject.token,
+            {
+              method: "POST" as const,
+              params: {
+                seriesId: selectedSeries.id,
+                page: 1,
+                size: 500,
+              },
             },
-          },
-        ]
+          ]
+        : `/api/cache?type=storyboard&id=${selectedSeries.id}`
       : null,
-    apiFetcher,
+    isAdmin
+      ? apiFetcher
+      : (url: string) => fetch(url).then((r) => r.json()),
   );
+
+  const storyboardListRaw: StoryboardItem[] = isAdmin
+    ? (storyboardData as StoryboardResponse)?.result?.list ?? []
+    : (storyboardData as { data: StoryboardItem[] })?.data ?? [];
+
+  // Admin: cache storyboard data to server
+  useEffect(() => {
+    if (isAdmin && storyboardListRaw.length > 0 && selectedSeries?.id) {
+      fetch("/api/cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "storyboard",
+          id: selectedSeries.id,
+          data: storyboardListRaw,
+        }),
+      }).catch(() => {});
+    }
+  }, [isAdmin, storyboardListRaw, selectedSeries?.id]);
 
   const {
     characters,
@@ -85,6 +112,7 @@ function StoryboardList() {
   } = useCharacters(
     currentProject?.projectId || null,
     currentProject?.token || "",
+    isAdmin,
   );
 
   const scrollRef = useCallback((node: HTMLDivElement | null) => {
@@ -100,20 +128,22 @@ function StoryboardList() {
     );
   }, []);
 
-  const storyboardList = storyboardData?.result?.list ?? [];
+  const storyboardList = storyboardListRaw;
 
-  // 没有项目配置
   if (availableProjects.length === 0) {
     return (
       <div className="flex h-[calc(100vh-120px)] items-center justify-center">
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>欢迎使用漫剧展示系统</EmptyTitle>
+            <EmptyTitle>
+              {isAdmin ? "欢迎使用漫剧展示系统" : "暂无共享项目"}
+            </EmptyTitle>
             <EmptyDescription>
               <div className="space-y-2">
-                <p>请点击右上角的设置按钮添加项目配置</p>
-                <p className="text-xs text-muted-foreground/80">
-                  您需要提供项目名称、项目ID和Token来开始使用
+                <p>
+                  {isAdmin
+                    ? "请点击右上角的设置按钮添加项目配置"
+                    : "管理员还没有共享任何项目，请联系管理员"}
                 </p>
               </div>
             </EmptyDescription>

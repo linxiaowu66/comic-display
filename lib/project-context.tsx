@@ -1,8 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { DEFAULT_PROJECTS, type Project } from "@/lib/config"
+import { type Project } from "@/lib/config"
 import { getStoredProjects } from "@/lib/storage"
+import { useAdmin } from "@/lib/hooks/use-admin"
 
 export interface SeriesItem {
   id: number
@@ -27,6 +28,7 @@ interface ProjectContextType {
   setSelectedSeries: (series: SeriesItem | null) => void
   availableProjects: Project[]
   refreshProjects: () => void
+  isAdmin: boolean
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -36,20 +38,40 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [currentProject, setCurrentProject] = useState<Project | null>(null)
   const [selectedSeries, setSelectedSeries] = useState<SeriesItem | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
+  const isAdmin = useAdmin()
 
   useEffect(() => {
     loadProjects()
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
-  function loadProjects() {
-    const storedProjects = getStoredProjects()
-    const allProjects = storedProjects.length > 0 ? storedProjects : DEFAULT_PROJECTS
-    setAvailableProjects(allProjects)
-    
-    if (!currentProject && allProjects.length > 0) {
-      setCurrentProject(allProjects[0])
+  async function loadProjects() {
+    if (isAdmin) {
+      const storedProjects = getStoredProjects()
+      setAvailableProjects(storedProjects)
+      if (!currentProject && storedProjects.length > 0) {
+        setCurrentProject(storedProjects[0])
+      }
+    } else {
+      try {
+        const res = await fetch("/api/share")
+        const data = await res.json()
+        const sharedProjects: Project[] = (data.projects ?? []).map(
+          (p: { id: string; name: string; projectId: number }) => ({
+            id: p.id,
+            name: p.name,
+            projectId: p.projectId,
+            token: "",
+          })
+        )
+        setAvailableProjects(sharedProjects)
+        if (!currentProject && sharedProjects.length > 0) {
+          setCurrentProject(sharedProjects[0])
+        }
+      } catch {
+        setAvailableProjects([])
+      }
     }
-    
     setIsInitialized(true)
   }
 
@@ -58,17 +80,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setSelectedSeries(null)
   }
 
-  // 如果已初始化但没有项目，渲染空状态
   if (isInitialized && availableProjects.length === 0) {
     return (
       <ProjectContext.Provider
         value={{
-          currentProject: null as any,
+          currentProject: null as unknown as Project,
           setCurrentProject: handleSetProject,
           selectedSeries: null,
           setSelectedSeries,
           availableProjects: [],
           refreshProjects: loadProjects,
+          isAdmin,
         }}
       >
         {children}
@@ -76,7 +98,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     )
   }
 
-  // 初始化中或没有当前项目时不渲染
   if (!isInitialized || !currentProject) {
     return null
   }
@@ -90,6 +111,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setSelectedSeries,
         availableProjects,
         refreshProjects: loadProjects,
+        isAdmin,
       }}
     >
       {children}

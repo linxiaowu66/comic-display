@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Trash2, Settings as SettingsIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2, Settings as SettingsIcon, Share2, Check, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -37,13 +37,66 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
     projectId: "",
     token: "",
   });
+  const [sharedProjectIds, setSharedProjectIds] = useState<Set<number>>(new Set());
+  const [sharingId, setSharingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      fetch("/api/share")
+        .then((res) => res.json())
+        .then((data) => {
+          const ids = new Set<number>(
+            (data.projects ?? []).map((p: { projectId: number }) => p.projectId)
+          );
+          setSharedProjectIds(ids);
+        })
+        .catch(() => {});
+    }
+  }, [open]);
+
+  async function handleShareProject(project: Project) {
+    setSharingId(project.id);
+    try {
+      await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: project.id,
+          name: project.name,
+          projectId: project.projectId,
+        }),
+      });
+      setSharedProjectIds((prev) => new Set(prev).add(project.projectId));
+    } catch (error) {
+      console.error("Failed to share:", error);
+    } finally {
+      setSharingId(null);
+    }
+  }
+
+  async function handleUnshareProject(project: Project) {
+    setSharingId(project.id);
+    try {
+      await fetch(`/api/share?projectId=${project.projectId}`, {
+        method: "DELETE",
+      });
+      setSharedProjectIds((prev) => {
+        const next = new Set(prev);
+        next.delete(project.projectId);
+        return next;
+      });
+    } catch (error) {
+      console.error("Failed to unshare:", error);
+    } finally {
+      setSharingId(null);
+    }
+  }
 
   function handleOpenChange(isOpen: boolean) {
     setOpen(isOpen);
     if (isOpen) {
       const loadedProjects = getStoredProjects();
       setProjects(loadedProjects);
-      // 如果没有项目，自动展开添加表单
       setIsAdding(loadedProjects.length === 0);
     }
   }
@@ -109,24 +162,57 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
               </Card>
             )}
 
-            {projects.map((project) => (
+            {projects.map((project) => {
+              const isShared = sharedProjectIds.has(project.projectId);
+              const isProcessing = sharingId === project.id;
+
+              return (
               <Card key={project.id}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
-                      <CardTitle className="text-base">{project.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-base">{project.name}</CardTitle>
+                        {isShared && (
+                          <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full">
+                            已共享
+                          </span>
+                        )}
+                      </div>
                       <CardDescription className="text-xs">
                         项目ID: {project.projectId}
                       </CardDescription>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteProject(project.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant={isShared ? "secondary" : "outline"}
+                        size="sm"
+                        className="h-8 text-xs gap-1.5"
+                        disabled={isProcessing}
+                        onClick={() =>
+                          isShared
+                            ? handleUnshareProject(project)
+                            : handleShareProject(project)
+                        }
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : isShared ? (
+                          <Check className="size-3.5" />
+                        ) : (
+                          <Share2 className="size-3.5" />
+                        )}
+                        {isShared ? "取消共享" : "共享"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteProject(project.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pb-3">
@@ -140,7 +226,8 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
 
             {/* Add New Project Form */}
             {isAdding && (

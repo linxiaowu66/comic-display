@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useProject, type SeriesItem } from "@/lib/project-context";
 import { apiFetcher } from "@/lib/api";
 import useSWR from "swr";
@@ -31,29 +32,52 @@ export function TopBar() {
     setSelectedSeries,
     availableProjects,
     refreshProjects,
+    isAdmin,
   } = useProject();
 
   const hasProjects = availableProjects.length > 0;
 
-  const { data: seriesData, isLoading: seriesLoading } = useSWR<SeriesResponse>(
+  // Admin: fetch from API; Non-admin: fetch cached from server
+  const { data: seriesData, isLoading: seriesLoading } = useSWR<
+    SeriesResponse | { data: SeriesItem[] }
+  >(
     currentProject?.projectId
-      ? [
-          "/storyboard/series/getSeries",
-          currentProject.token,
-          {
-            method: "POST" as const,
-            params: { projectId: currentProject.projectId, page: 1, size: 100 },
-          },
-        ]
+      ? isAdmin
+        ? [
+            "/storyboard/series/getSeries",
+            currentProject.token,
+            {
+              method: "POST" as const,
+              params: {
+                projectId: currentProject.projectId,
+                page: 1,
+                size: 100,
+              },
+            },
+          ]
+        : `/api/cache?type=series&id=${currentProject.projectId}`
       : null,
-    apiFetcher,
+    isAdmin ? apiFetcher : (url: string) => fetch(url).then((r) => r.json()),
   );
 
-  console.log("[v0] seriesData:", JSON.stringify(seriesData));
-  console.log("[v0] seriesLoading:", seriesLoading);
+  const seriesList: SeriesItem[] = isAdmin
+    ? (seriesData as SeriesResponse)?.result?.items ?? []
+    : (seriesData as { data: SeriesItem[] })?.data ?? [];
 
-  const seriesList = seriesData?.result?.items ?? [];
-  console.log("[v0] seriesList length:", seriesList.length);
+  // Admin: cache series data to server when fetched
+  useEffect(() => {
+    if (isAdmin && seriesList.length > 0 && currentProject?.projectId) {
+      fetch("/api/cache", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "series",
+          id: currentProject.projectId,
+          data: seriesList,
+        }),
+      }).catch(() => {});
+    }
+  }, [isAdmin, seriesList, currentProject?.projectId]);
 
   function handleProjectChange(projectId: string) {
     const project = availableProjects.find((p) => p.id === projectId);
@@ -135,14 +159,18 @@ export function TopBar() {
 
               <Separator orientation="vertical" className="h-5" />
             </>
-          ) : (
+          ) : isAdmin ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>暂无项目配置，点击右侧设置按钮添加</span>
               <Separator orientation="vertical" className="h-5" />
             </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>暂无共享项目</span>
+            </div>
           )}
 
-          <ProjectSettings onProjectsChange={refreshProjects} />
+          {isAdmin && <ProjectSettings onProjectsChange={refreshProjects} />}
         </div>
       </div>
     </header>
