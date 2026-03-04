@@ -47,7 +47,46 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const isAdmin = useAdmin();
 
   useEffect(() => {
-    loadProjects();
+    let cancelled = false;
+
+    async function load() {
+      if (isAdmin) {
+        const storedProjects = getStoredProjects();
+        if (cancelled) return;
+        setAvailableProjects(storedProjects);
+        if (storedProjects.length > 0) {
+          const match = currentProject
+            ? storedProjects.find((p) => p.projectId === currentProject.projectId)
+            : null;
+          setCurrentProject(match ?? storedProjects[0]);
+        }
+      } else {
+        try {
+          const res = await fetch("/api/share");
+          const data = await res.json();
+          // If isAdmin became true while fetching, discard this stale result.
+          if (cancelled) return;
+          const sharedProjects: Project[] = (data.projects ?? []).map(
+            (p: { id: string; name: string; projectId: number }) => ({
+              id: p.id,
+              name: p.name,
+              projectId: p.projectId,
+              token: "",
+            }),
+          );
+          setAvailableProjects(sharedProjects);
+          if (!currentProject && sharedProjects.length > 0) {
+            setCurrentProject(sharedProjects[0]);
+          }
+        } catch {
+          if (!cancelled) setAvailableProjects([]);
+        }
+      }
+      if (!cancelled) setIsInitialized(true);
+    }
+
+    load();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
@@ -55,8 +94,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     if (isAdmin) {
       const storedProjects = getStoredProjects();
       setAvailableProjects(storedProjects);
-      if (!currentProject && storedProjects.length > 0) {
-        setCurrentProject(storedProjects[0]);
+      if (storedProjects.length > 0) {
+        const match = currentProject
+          ? storedProjects.find((p) => p.projectId === currentProject.projectId)
+          : null;
+        setCurrentProject(match ?? storedProjects[0]);
       }
     } else {
       try {

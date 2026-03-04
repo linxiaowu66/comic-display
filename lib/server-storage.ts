@@ -1,4 +1,4 @@
-import { put, head } from "@vercel/blob";
+import { put, get } from "@vercel/blob";
 
 const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN;
 
@@ -6,10 +6,10 @@ const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN;
 
 async function blobGet<T>(pathname: string, fallback: T): Promise<T> {
   try {
-    const meta = await head(pathname);
-    const res = await fetch(meta.url);
-    if (!res.ok) return fallback;
-    return (await res.json()) as T;
+    const result = await get(pathname, { access: "private" });
+    if (!result || result.statusCode !== 200) return fallback;
+    const text = await new Response(result.stream).text();
+    return JSON.parse(text) as T;
   } catch {
     return fallback;
   }
@@ -17,7 +17,7 @@ async function blobGet<T>(pathname: string, fallback: T): Promise<T> {
 
 async function blobPut(pathname: string, data: unknown): Promise<void> {
   await put(pathname, JSON.stringify(data), {
-    access: "public",
+    access: "private",
     contentType: "application/json",
     allowOverwrite: true,
   });
