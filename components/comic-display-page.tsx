@@ -55,7 +55,8 @@ interface StoryboardResponse {
 }
 
 function StoryboardList() {
-  const { selectedSeries, currentProject, availableProjects, isAdmin } = useProject();
+  const { selectedSeries, currentProject, availableProjects, isAdmin } =
+    useProject();
   const [previewImage, setPreviewImage] = useState<{
     src: string;
     alt: string;
@@ -81,14 +82,12 @@ function StoryboardList() {
           ]
         : `/api/cache?type=storyboard&id=${selectedSeries.id}`
       : null,
-    isAdmin
-      ? apiFetcher
-      : (url: string) => fetch(url).then((r) => r.json()),
+    isAdmin ? apiFetcher : (url: string) => fetch(url).then((r) => r.json()),
   );
 
   const storyboardListRaw: StoryboardItem[] = isAdmin
-    ? (storyboardData as StoryboardResponse)?.result?.list ?? []
-    : (storyboardData as { data: StoryboardItem[] })?.data ?? [];
+    ? ((storyboardData as StoryboardResponse)?.result?.list ?? [])
+    : ((storyboardData as { data: StoryboardItem[] })?.data ?? []);
 
   // Admin: cache storyboard data to server
   useEffect(() => {
@@ -243,12 +242,12 @@ function StoryboardList() {
                   >
                     {character.name}
                   </h3>
-                  {character.description && (
+                  {character.prompt && (
                     <p
                       className="text-xs text-muted-foreground line-clamp-2"
-                      title={character.description}
+                      title={character.prompt}
                     >
-                      {character.description}
+                      {character.prompt}
                     </p>
                   )}
                 </div>
