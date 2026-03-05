@@ -18,6 +18,13 @@ import {
 import { useCharacters } from "@/lib/hooks/use-characters";
 import { CharacterMention } from "@/components/character-mention";
 import { ImagePreview } from "@/components/image-preview";
+import type { Character } from "@/lib/types/character";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface NarrationItem {
   index: number;
@@ -579,6 +586,102 @@ function MaterialList() {
 
 const STORYBOARD_PAGE_SIZE = 20;
 
+// ─── Character detail dialog ──────────────────────────────────────────────────
+
+function CharacterDialog({
+  character,
+  onClose,
+}: {
+  character: Character | null;
+  onClose: () => void;
+}) {
+  const [activeImg, setActiveImg] = useState(0);
+
+  if (!character) return null;
+
+  const images = character.resourceUrl ?? [];
+
+  return (
+    <Dialog open={!!character} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-lg">{character.name}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-1">
+          {/* Image gallery */}
+          {images.length > 0 && (
+            <div className="space-y-2">
+              {/* Main image */}
+              <div className="relative w-full overflow-hidden rounded-xl bg-muted/20 border border-border/40" style={{ maxHeight: 380 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={images[activeImg]}
+                  alt={character.name}
+                  className="w-full h-full object-contain"
+                  style={{ maxHeight: 380 }}
+                />
+              </div>
+
+              {/* Thumbnail strip — only shown when there are multiple images */}
+              {images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {images.map((url, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActiveImg(i)}
+                      className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        i === activeImg
+                          ? "border-primary shadow-md"
+                          : "border-border/40 opacity-60 hover:opacity-100"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`${character.name} ${i + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Prompt */}
+          {character.prompt && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-border/40" />
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium shrink-0">
+                  提示词
+                </span>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+              <p className="text-sm leading-relaxed text-foreground/80 bg-muted/20 rounded-lg p-3">
+                {character.prompt}
+              </p>
+            </div>
+          )}
+
+          {/* Description */}
+          {character.description && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="h-px flex-1 bg-border/40" />
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium shrink-0">
+                  描述
+                </span>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+              <p className="text-sm leading-relaxed text-foreground/80 bg-muted/20 rounded-lg p-3">
+                {character.description}
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function PaginationBar({
   page,
   totalPages,
@@ -617,6 +720,7 @@ function StoryboardList() {
     src: string;
     alt: string;
   } | null>(null);
+  const [selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -781,8 +885,12 @@ function StoryboardList() {
               style={{ scrollbarWidth: "thin" }}
             >
               {characters.map((character) => (
-                <div key={character.id} className="shrink-0 w-[100px] group">
-                  <div className="aspect-square rounded-xl overflow-hidden bg-muted/30 border border-border/50 group-hover:border-primary/30 transition-all shadow-sm group-hover:shadow-md">
+                <button
+                  key={character.id}
+                  className="shrink-0 w-[100px] group text-left cursor-pointer"
+                  onClick={() => setSelectedCharacter(character)}
+                >
+                  <div className="aspect-square rounded-xl overflow-hidden bg-muted/30 border border-border/50 group-hover:border-primary/40 transition-all shadow-sm group-hover:shadow-md relative">
                     {character.resourceUrl && character.resourceUrl.length > 0 ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -795,6 +903,11 @@ function StoryboardList() {
                         👤
                       </div>
                     )}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-end justify-center pb-1.5">
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-white font-medium bg-black/50 px-2 py-0.5 rounded-full backdrop-blur-sm">
+                        查看详情
+                      </span>
+                    </div>
                   </div>
                   <p
                     className="mt-1.5 text-xs font-medium truncate text-center text-foreground/80"
@@ -802,7 +915,7 @@ function StoryboardList() {
                   >
                     {character.name}
                   </p>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -999,6 +1112,12 @@ function StoryboardList() {
           onOpenChange={(open) => !open && setPreviewImage(null)}
         />
       )}
+
+      {/* Character Detail Dialog */}
+      <CharacterDialog
+        character={selectedCharacter}
+        onClose={() => setSelectedCharacter(null)}
+      />
     </div>
   );
 }
