@@ -13,10 +13,11 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, name, projectId } = body as {
+    const { id, name, projectId, source } = body as {
       id: string;
       name: string;
       projectId: number;
+      source?: "storyboard" | "material";
     };
 
     if (!name || !projectId) {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await addSharedProject({ id, name, projectId });
+    await addSharedProject({ id, name, projectId, source });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Share error:", error);

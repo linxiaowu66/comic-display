@@ -15,6 +15,11 @@ import { Film } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ProjectSettings } from "@/components/project-settings";
 
+const MATERIAL_CATEGORIES = [
+  { value: 4, label: "分镜图" },
+  { value: 5, label: "分镜视频" },
+];
+
 interface SeriesResponse {
   code: string;
   msg: string;
@@ -30,18 +35,22 @@ export function TopBar() {
     setCurrentProject,
     selectedSeries,
     setSelectedSeries,
+    selectedCategory,
+    setSelectedCategory,
     availableProjects,
     refreshProjects,
     isAdmin,
   } = useProject();
 
+  const isMaterial = currentProject?.source === "material";
+
   const hasProjects = availableProjects.length > 0;
 
-  // Admin: fetch from API; Non-admin: fetch cached from server
+  // Admin: fetch from API; Non-admin: fetch cached from server (storyboard only)
   const { data: seriesData, isLoading: seriesLoading } = useSWR<
     SeriesResponse | { data: SeriesItem[] }
   >(
-    currentProject?.projectId
+    !isMaterial && currentProject?.projectId
       ? isAdmin
         ? [
             "/storyboard/series/getSeries",
@@ -66,7 +75,7 @@ export function TopBar() {
 
   // Admin: cache series data to server when fetched
   useEffect(() => {
-    if (isAdmin && seriesList.length > 0 && currentProject?.projectId) {
+    if (!isMaterial && isAdmin && seriesList.length > 0 && currentProject?.projectId) {
       fetch("/api/cache", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,7 +86,7 @@ export function TopBar() {
         }),
       }).catch(() => {});
     }
-  }, [isAdmin, seriesList, currentProject?.projectId]);
+  }, [isMaterial, isAdmin, seriesList, currentProject?.projectId]);
 
   function handleProjectChange(projectId: string) {
     const project = availableProjects.find((p) => p.id === projectId);
@@ -129,33 +138,54 @@ export function TopBar() {
 
               <Separator orientation="vertical" className="h-5" />
 
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">剧集</span>
-                <Select
-                  value={selectedSeries ? String(selectedSeries.id) : undefined}
-                  onValueChange={handleSeriesChange}
-                  disabled={seriesLoading || seriesList.length === 0}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue
-                      placeholder={
-                        seriesLoading
-                          ? "加载中..."
-                          : seriesList.length === 0
-                            ? "暂无剧集"
-                            : "选择剧集"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {seriesList.map((series) => (
-                      <SelectItem key={series.id} value={String(series.id)}>
-                        {series.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isMaterial ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">素材类型</span>
+                  <Select
+                    value={String(selectedCategory)}
+                    onValueChange={(v) => setSelectedCategory(Number(v))}
+                  >
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue placeholder="选择素材类型" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MATERIAL_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={String(cat.value)}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">剧集</span>
+                  <Select
+                    value={selectedSeries ? String(selectedSeries.id) : undefined}
+                    onValueChange={handleSeriesChange}
+                    disabled={seriesLoading || seriesList.length === 0}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue
+                        placeholder={
+                          seriesLoading
+                            ? "加载中..."
+                            : seriesList.length === 0
+                              ? "暂无剧集"
+                              : "选择剧集"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {seriesList.map((series) => (
+                        <SelectItem key={series.id} value={String(series.id)}>
+                          {series.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <Separator orientation="vertical" className="h-5" />
             </>

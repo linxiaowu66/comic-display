@@ -3,12 +3,13 @@ interface FetcherOptions {
   token: string
   method?: "GET" | "POST"
   params?: Record<string, unknown>
+  apiHost?: string
 }
 
 export async function apiFetcher([path, token, options]: [
   string,
   string,
-  { method?: "GET" | "POST"; params?: Record<string, unknown> }?,
+  { method?: "GET" | "POST"; params?: Record<string, unknown>; apiHost?: string }?,
 ]) {
   const response = await fetch("/api/proxy", {
     method: "POST",
@@ -18,6 +19,7 @@ export async function apiFetcher([path, token, options]: [
       token,
       method: options?.method ?? "GET",
       params: options?.params ?? {},
+      apiHost: options?.apiHost,
     }),
   })
   if (!response.ok) {
@@ -26,6 +28,6 @@ export async function apiFetcher([path, token, options]: [
   return response.json()
 }
 
-export async function apiPost({ path, token, params }: FetcherOptions) {
-  return apiFetcher([path, token, { method: "POST", params }])
+export async function apiPost({ path, token, params, apiHost }: FetcherOptions) {
+  return apiFetcher([path, token, { method: "POST", params, apiHost }])
 }

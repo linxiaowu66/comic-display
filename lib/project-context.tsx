@@ -32,6 +32,8 @@ interface ProjectContextType {
   setCurrentProject: (project: Project) => void;
   selectedSeries: SeriesItem | null;
   setSelectedSeries: (series: SeriesItem | null) => void;
+  selectedCategory: number;
+  setSelectedCategory: (category: number) => void;
   availableProjects: Project[];
   refreshProjects: () => void;
   isAdmin: boolean;
@@ -43,6 +45,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [availableProjects, setAvailableProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<SeriesItem | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<number>(4);
   const [isInitialized, setIsInitialized] = useState(false);
   const isAdmin = useAdmin();
 
@@ -67,11 +70,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           // If isAdmin became true while fetching, discard this stale result.
           if (cancelled) return;
           const sharedProjects: Project[] = (data.projects ?? []).map(
-            (p: { id: string; name: string; projectId: number }) => ({
+            (p: { id: string; name: string; projectId: number; source?: "storyboard" | "material" }) => ({
               id: p.id,
               name: p.name,
               projectId: p.projectId,
               token: "",
+              source: p.source ?? "storyboard",
             }),
           );
           setAvailableProjects(sharedProjects);
@@ -105,11 +109,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const res = await fetch("/api/share");
         const data = await res.json();
         const sharedProjects: Project[] = (data.projects ?? []).map(
-          (p: { id: string; name: string; projectId: number }) => ({
+          (p: { id: string; name: string; projectId: number; source?: "storyboard" | "material" }) => ({
             id: p.id,
             name: p.name,
             projectId: p.projectId,
             token: "",
+            source: p.source ?? "storyboard",
           }),
         );
         setAvailableProjects(sharedProjects);
@@ -126,6 +131,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   function handleSetProject(project: Project) {
     setCurrentProject(project);
     setSelectedSeries(null);
+    setSelectedCategory(4);
   }
 
   if (isInitialized && availableProjects.length === 0) {
@@ -136,6 +142,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           setCurrentProject: handleSetProject,
           selectedSeries: null,
           setSelectedSeries,
+          selectedCategory,
+          setSelectedCategory,
           availableProjects: [],
           refreshProjects: loadProjects,
           isAdmin,
@@ -157,6 +165,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         setCurrentProject: handleSetProject,
         selectedSeries,
         setSelectedSeries,
+        selectedCategory,
+        setSelectedCategory,
         availableProjects,
         refreshProjects: loadProjects,
         isAdmin,

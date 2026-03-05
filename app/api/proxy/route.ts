@@ -9,11 +9,13 @@ export async function POST(request: NextRequest) {
       token,
       method = "GET",
       params = {},
+      apiHost,
     } = body as {
       path: string;
       token: string;
       method?: string;
       params?: Record<string, unknown>;
+      apiHost?: string;
     };
 
     if (!path || !token) {
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
       "Content-Type": "application/json",
     };
 
-    let url = `${API_HOST}${path}`;
+    let url = `${apiHost ?? API_HOST}${path}`;
     const fetchOptions: RequestInit = { headers };
 
     if (method === "POST") {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Settings as SettingsIcon, Share2, Check, Loader2 } from "lucide-react";
+import { Plus, Trash2, Settings as SettingsIcon, Share2, Check, Loader2, Video, Image } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,9 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
     name: "",
     projectId: "",
     token: "",
+    source: "storyboard" as "storyboard" | "material",
+    fragmentId: "",
+    userId: "",
   });
   const [sharedProjectIds, setSharedProjectIds] = useState<Set<number>>(new Set());
   const [sharingId, setSharingId] = useState<string | null>(null);
@@ -64,6 +67,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
           id: project.id,
           name: project.name,
           projectId: project.projectId,
+          source: project.source,
         }),
       });
       setSharedProjectIds((prev) => new Set(prev).add(project.projectId));
@@ -102,22 +106,27 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
   }
 
   function handleAddProject() {
-    if (!newProject.name || !newProject.projectId || !newProject.token) {
-      return;
-    }
+    const isMaterial = newProject.source === "material";
+    if (!newProject.name || !newProject.projectId || !newProject.token) return;
+    if (isMaterial && (!newProject.fragmentId || !newProject.userId)) return;
 
     const project: Project = {
       id: `custom-${Date.now()}`,
       name: newProject.name,
       projectId: parseInt(newProject.projectId, 10),
       token: newProject.token,
+      source: newProject.source,
+      ...(isMaterial && {
+        fragmentId: parseInt(newProject.fragmentId, 10),
+        userId: parseInt(newProject.userId, 10),
+      }),
     };
 
     const updatedProjects = [...projects, project];
     setProjects(updatedProjects);
     saveProjects(updatedProjects);
-    
-    setNewProject({ name: "", projectId: "", token: "" });
+
+    setNewProject({ name: "", projectId: "", token: "", source: "storyboard", fragmentId: "", userId: "" });
     setIsAdding(false);
     onProjectsChange();
   }
@@ -135,7 +144,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
           <SettingsIcon className="size-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>项目设置</DialogTitle>
           <DialogDescription>
@@ -169,18 +178,28 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
               return (
               <Card key={project.id}>
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-base">{project.name}</CardTitle>
+                        <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
+                          project.source === "material"
+                            ? "bg-blue-500/10 text-blue-600"
+                            : "bg-purple-500/10 text-purple-600"
+                        }`}>
+                          {project.source === "material" ? "素材系统" : "漫剧系统"}
+                        </span>
                         {isShared && (
-                          <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full">
+                          <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                             已共享
                           </span>
                         )}
                       </div>
                       <CardDescription className="text-xs">
                         项目ID: {project.projectId}
+                        {project.source === "material" && project.fragmentId && (
+                          <> · 任务ID: {project.fragmentId}</>
+                        )}
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-1">
@@ -236,6 +255,37 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                   <CardTitle className="text-base">添加新项目</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Source type selector */}
+                  <div className="space-y-2">
+                    <Label>系统类型</Label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewProject({ ...newProject, source: "storyboard", fragmentId: "", userId: "" })}
+                        className={`flex-1 flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                          newProject.source === "storyboard"
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-border hover:bg-muted/50 text-muted-foreground"
+                        }`}
+                      >
+                        <Video className="size-4" />
+                        漫剧系统
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewProject({ ...newProject, source: "material" })}
+                        className={`flex-1 flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                          newProject.source === "material"
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-border hover:bg-muted/50 text-muted-foreground"
+                        }`}
+                      >
+                        <Image className="size-4" />
+                        素材系统
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="project-name">项目名称</Label>
                     <Input
@@ -253,13 +303,43 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                     <Input
                       id="project-id"
                       type="number"
-                      placeholder="例如：7026"
+                      placeholder="例如：2806"
                       value={newProject.projectId}
                       onChange={(e) =>
                         setNewProject({ ...newProject, projectId: e.target.value })
                       }
                     />
                   </div>
+
+                  {newProject.source === "material" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="fragment-id">任务ID（fragment_id）</Label>
+                        <Input
+                          id="fragment-id"
+                          type="number"
+                          placeholder="例如：23963"
+                          value={newProject.fragmentId}
+                          onChange={(e) =>
+                            setNewProject({ ...newProject, fragmentId: e.target.value })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="user-id">用户ID（user_id）</Label>
+                        <Input
+                          id="user-id"
+                          type="number"
+                          placeholder="例如：3717"
+                          value={newProject.userId}
+                          onChange={(e) =>
+                            setNewProject({ ...newProject, userId: e.target.value })
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="project-token">Token</Label>
@@ -279,7 +359,8 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                       disabled={
                         !newProject.name ||
                         !newProject.projectId ||
-                        !newProject.token
+                        !newProject.token ||
+                        (newProject.source === "material" && (!newProject.fragmentId || !newProject.userId))
                       }
                     >
                       保存
@@ -288,7 +369,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                       variant="outline"
                       onClick={() => {
                         setIsAdding(false);
-                        setNewProject({ name: "", projectId: "", token: "" });
+                        setNewProject({ name: "", projectId: "", token: "", source: "storyboard", fragmentId: "", userId: "" });
                       }}
                     >
                       取消

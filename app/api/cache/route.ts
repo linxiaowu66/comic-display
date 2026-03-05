@@ -6,15 +6,27 @@ import {
   cacheCharacters,
   getCachedStoryboard,
   cacheStoryboard,
+  getCachedMaterial,
+  cacheMaterial,
 } from "@/lib/server-storage";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
-  const id = Number(searchParams.get("id"));
+  const idRaw = searchParams.get("id");
 
-  if (!type || !id) {
+  if (!type || !idRaw) {
     return NextResponse.json({ error: "Missing type or id" }, { status: 400 });
+  }
+
+  // Material uses a string key like "2806_4" (projectId_category)
+  if (type === "material") {
+    return NextResponse.json({ data: await getCachedMaterial(idRaw) });
+  }
+
+  const id = Number(idRaw);
+  if (!id) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
   switch (type) {
@@ -34,7 +46,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { type, id, data } = body as {
       type: string;
-      id: number;
+      id: string | number;
       data: unknown[];
     };
 
@@ -45,15 +57,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Material uses a string key
+    if (type === "material") {
+      await cacheMaterial(String(id), data);
+      return NextResponse.json({ success: true });
+    }
+
+    const numId = Number(id);
+    if (!numId) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+
     switch (type) {
       case "series":
-        await cacheSeries(id, data);
+        await cacheSeries(numId, data);
         break;
       case "characters":
-        await cacheCharacters(id, data);
+        await cacheCharacters(numId, data);
         break;
       case "storyboard":
-        await cacheStoryboard(id, data);
+        await cacheStoryboard(numId, data);
         break;
       default:
         return NextResponse.json({ error: "Invalid type" }, { status: 400 });

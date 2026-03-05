@@ -29,6 +29,7 @@ export interface SharedProject {
   id: string;
   name: string;
   projectId: number;
+  source?: "storyboard" | "material";
 }
 
 // --- In-memory fallback (used when BLOB_READ_WRITE_TOKEN is not set) ---
@@ -37,6 +38,7 @@ const memSharedProjects: SharedProject[] = [];
 const memSeriesCache = new Map<number, unknown[]>();
 const memCharactersCache = new Map<number, unknown[]>();
 const memStoryboardCache = new Map<number, unknown[]>();
+const memMaterialCache = new Map<string, unknown[]>();
 
 // --- Shared Projects ---
 
@@ -130,4 +132,22 @@ export async function cacheStoryboard(
     return;
   }
   await blobPut(`cache/storyboard-${seriesId}.json`, storyboard);
+}
+
+// --- Cached Material (key = "{projectId}_{category}") ---
+
+export async function getCachedMaterial(key: string): Promise<unknown[]> {
+  if (!USE_BLOB) return memMaterialCache.get(key) ?? [];
+  return blobGet<unknown[]>(`cache/material-${key}.json`, []);
+}
+
+export async function cacheMaterial(
+  key: string,
+  data: unknown[],
+): Promise<void> {
+  if (!USE_BLOB) {
+    memMaterialCache.set(key, data);
+    return;
+  }
+  await blobPut(`cache/material-${key}.json`, data);
 }
