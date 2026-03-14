@@ -32,9 +32,25 @@ export interface SharedProject {
   source?: "storyboard" | "material";
 }
 
+export interface AppUser {
+  id: string;
+  username: string;
+  password: string; // generated 10-char string
+  createdAt: number;
+}
+
+export interface LoginRecord {
+  id: string;
+  username: string;
+  ip: string;
+  timestamp: number;
+}
+
 // --- In-memory fallback (used when BLOB_READ_WRITE_TOKEN is not set) ---
 
 const memSharedProjects: SharedProject[] = [];
+const memUsers: AppUser[] = [];
+const memLoginRecords: LoginRecord[] = [];
 const memSeriesCache = new Map<number, unknown[]>();
 const memCharactersCache = new Map<number, unknown[]>();
 const memStoryboardCache = new Map<number, unknown[]>();
@@ -74,6 +90,50 @@ export async function removeSharedProject(projectId: number): Promise<void> {
     "shared-projects.json",
     projects.filter((p) => p.projectId !== projectId),
   );
+}
+
+// --- Users ---
+
+export async function getUsers(): Promise<AppUser[]> {
+  let users: AppUser[] = [];
+  if (!USE_BLOB) {
+    users = [...memUsers];
+  } else {
+    users = await blobGet<AppUser[]>("app-users.json", []);
+  }
+
+  return users;
+}
+
+export async function saveUsers(users: AppUser[]): Promise<void> {
+  if (!USE_BLOB) {
+    memUsers.length = 0;
+    memUsers.push(...users);
+    return;
+  }
+  await blobPut("app-users.json", users);
+}
+
+export async function getUser(username: string): Promise<AppUser | undefined> {
+  const users = await getUsers();
+  return users.find((u) => u.username === username);
+}
+
+// --- Login Records ---
+
+export async function getLoginRecords(): Promise<LoginRecord[]> {
+  if (!USE_BLOB) return [...memLoginRecords];
+  return blobGet<LoginRecord[]>("login-records.json", []);
+}
+
+export async function addLoginRecord(record: LoginRecord): Promise<void> {
+  if (!USE_BLOB) {
+    memLoginRecords.push(record);
+    return;
+  }
+  const records = await getLoginRecords();
+  records.push(record);
+  await blobPut("login-records.json", records);
 }
 
 // --- Cached Series ---

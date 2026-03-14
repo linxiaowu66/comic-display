@@ -14,6 +14,9 @@ import {
 import { Film } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { ProjectSettings } from "@/components/project-settings";
+import { LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 const MATERIAL_CATEGORIES = [
   { value: 4, label: "分镜图" },
@@ -41,6 +44,9 @@ export function TopBar() {
     refreshProjects,
     isAdmin,
   } = useProject();
+
+  const router = useRouter();
+  const { data: userData, mutate: mutateUser } = useSWR<{ username: string }>("/api/auth/me", (url: string) => fetch(url).then(res => res.json()));
 
   const isMaterial = currentProject?.source === "material";
 
@@ -100,6 +106,13 @@ export function TopBar() {
     if (series) {
       setSelectedSeries(series);
     }
+  }
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    localStorage.removeItem("isJzOwner");
+    mutateUser(undefined);
+    router.push("/login");
   }
 
   return (
@@ -201,6 +214,19 @@ export function TopBar() {
           )}
 
           {isAdmin && <ProjectSettings onProjectsChange={refreshProjects} />}
+          
+          <Separator orientation="vertical" className="h-5" />
+          
+          <div className="flex items-center gap-3">
+            {userData?.username && (
+              <span className="text-sm font-medium text-muted-foreground hidden sm:inline-block">
+                {userData.username}
+              </span>
+            )}
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="退出登录" className="size-8 text-muted-foreground hover:text-foreground">
+              <LogOut className="size-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </header>
