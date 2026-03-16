@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { Project } from "@/lib/config";
-import { getStoredProjects, saveProjects, deleteProject } from "@/lib/storage";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserManagement } from "@/components/user-management";
 import { LoginRecords } from "@/components/login-records";
@@ -43,27 +42,30 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
     fragmentId: "",
     userId: "",
   });
-  const [sharedProjectIds, setSharedProjectIds] = useState<Set<number>>(new Set());
   const [sharingId, setSharingId] = useState<string | null>(null);
+
+  async function loadProjects() {
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      const loaded = data.projects || [];
+      setProjects(loaded);
+      if (loaded.length === 0) setIsAdding(true);
+    } catch (error) {
+      console.error("Failed to load projects:", error);
+    }
+  }
 
   useEffect(() => {
     if (open) {
-      fetch("/api/share")
-        .then((res) => res.json())
-        .then((data) => {
-          const ids = new Set<number>(
-            (data.projects ?? []).map((p: { projectId: number }) => p.projectId)
-          );
-          setSharedProjectIds(ids);
-        })
-        .catch(() => {});
+      loadProjects();
     }
   }, [open]);
 
-  async function handleShareProject(project: Project) {
+  async function handleToggleShare(project: Project, isShared: boolean) {
     setSharingId(project.id);
     try {
-      await fetch("/api/share", {
+      await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -71,29 +73,16 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
           name: project.name,
           projectId: project.projectId,
           source: project.source,
+          token: project.token,
+          fragmentId: project.fragmentId,
+          userId: project.userId,
+          isShared,
         }),
       });
-      setSharedProjectIds((prev) => new Set(prev).add(project.projectId));
+      await loadProjects();
+      onProjectsChange();
     } catch (error) {
-      console.error("Failed to share:", error);
-    } finally {
-      setSharingId(null);
-    }
-  }
-
-  async function handleUnshareProject(project: Project) {
-    setSharingId(project.id);
-    try {
-      await fetch(`/api/share?projectId=${project.projectId}`, {
-        method: "DELETE",
-      });
-      setSharedProjectIds((prev) => {
-        const next = new Set(prev);
-        next.delete(project.projectId);
-        return next;
-      });
-    } catch (error) {
-      console.error("Failed to unshare:", error);
+      console.error("Failed to toggle share:", error);
     } finally {
       setSharingId(null);
     }
@@ -101,43 +90,50 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
 
   function handleOpenChange(isOpen: boolean) {
     setOpen(isOpen);
-    if (isOpen) {
-      const loadedProjects = getStoredProjects();
-      setProjects(loadedProjects);
-      setIsAdding(loadedProjects.length === 0);
-    }
   }
 
-  function handleAddProject() {
+  async function handleAddProject() {
     const isMaterial = newProject.source === "material";
     if (!newProject.name || !newProject.projectId || !newProject.token) return;
     if (isMaterial && (!newProject.fragmentId || !newProject.userId)) return;
 
-    const project: Project = {
-      id: `custom-${Date.now()}`,
-      name: newProject.name,
-      projectId: parseInt(newProject.projectId, 10),
-      token: newProject.token,
-      source: newProject.source,
-      ...(isMaterial && {
-        fragmentId: parseInt(newProject.fragmentId, 10),
-        userId: parseInt(newProject.userId, 10),
-      }),
-    };
-
-    const updatedProjects = [...projects, project];
-    setProjects(updatedProjects);
-    saveProjects(updatedProjects);
-
-    setNewProject({ name: "", projectId: "", token: "", source: "storyboard", fragmentId: "", userId: "" });
-    setIsAdding(false);
-    onProjectsChange();
+    try {
+      await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: `custom-${Date.now()}`,
+          name: newProject.name,
+          projectId: parseInt(newProject.projectId, 10),
+          token: newProject.token,
+          source: newProject.source,
+          ...(isMaterial && {
+            fragmentId: parseInt(newProject.fragmentId, 10),
+            userId: parseInt(newProject.userId, 10),
+          }),
+          isShared: false,
+        }),
+      });
+      
+      setNewProject({ name: "", projectId: "", token: "", source: "storyboard", fragmentId: "", userId: "" });
+      setIsAdding(false);
+      await loadProjects();
+      onProjectsChange();
+    } catch (error) {
+      console.error("Failed to add project:", error);
+    }
   }
 
-  function handleDeleteProject(id: string) {
-    deleteProject(id);
-    setProjects(projects.filter((p) => p.id !== id));
-    onProjectsChange();
+  async function handleDeleteProject(projectId: number) {
+    try {
+      await fetch(`/api/projects?projectId=${projectId}`, {
+        method: "DELETE",
+      });
+      await loadProjects();
+      onProjectsChange();
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+    }
   }
 
   return (
@@ -197,7 +193,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
               )}
 
               {projects.map((project) => {
-                const isShared = sharedProjectIds.has(project.projectId);
+                const isShared = project.isShared;
                 const isProcessing = sharingId === project.id;
 
                 return (
@@ -233,11 +229,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                             size="sm"
                             className="h-8 text-xs gap-1.5"
                             disabled={isProcessing}
-                            onClick={() =>
-                              isShared
-                                ? handleUnshareProject(project)
-                                : handleShareProject(project)
-                            }
+                            onClick={() => handleToggleShare(project, !isShared)}
                           >
                             {isProcessing ? (
                               <Loader2 className="size-3.5 animate-spin" />
@@ -252,7 +244,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                             variant="ghost"
                             size="icon"
                             className="size-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteProject(project.id)}
+                            onClick={() => handleDeleteProject(project.projectId)}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -264,7 +256,7 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
                         <div>
                           <Label className="text-xs text-muted-foreground">Token</Label>
                           <div className="mt-1 rounded-md bg-muted px-3 py-2 font-mono text-xs break-all">
-                            {project.token.substring(0, 50)}...
+                            {(project.token || "").substring(0, 50)}...
                           </div>
                         </div>
                       </div>
@@ -424,10 +416,9 @@ export function ProjectSettings({ onProjectsChange }: ProjectSettingsProps) {
               <CardContent className="pt-4 text-xs text-muted-foreground space-y-2">
                 <p className="font-medium">💡 使用说明：</p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
-                  <li>项目配置保存在浏览器本地存储中</li>
-                  <li>清除浏览器数据会导致配置丢失</li>
-                  <li>Token信息仅存储在本地，不会上传到服务器</li>
-                  <li>如需在其他设备使用，需要重新配置</li>
+                  <li>项目配置和Token已迁移到线上安全存储</li>
+                  <li>开启共享后，其他普通用户将能看到该项目</li>
+                  <li>项目信息不会因为清空浏览器缓存而丢失</li>
                 </ul>
               </CardContent>
             </Card>

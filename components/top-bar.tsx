@@ -69,6 +69,7 @@ export function TopBar() {
                 size: 100,
               },
             },
+            `/api/cache?type=series&id=${currentProject.projectId}`
           ]
         : `/api/cache?type=series&id=${currentProject.projectId}`
       : null,
@@ -76,7 +77,7 @@ export function TopBar() {
   );
 
   const seriesList: SeriesItem[] = isAdmin
-    ? (seriesData as SeriesResponse)?.result?.items ?? []
+    ? (seriesData as SeriesResponse)?.result?.items ?? (seriesData as { data: SeriesItem[] })?.data ?? []
     : (seriesData as { data: SeriesItem[] })?.data ?? [];
 
   // Admin: cache series data to server when fetched
@@ -110,7 +111,6 @@ export function TopBar() {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    localStorage.removeItem("isJzOwner");
     mutateUser(undefined);
     router.push("/login");
   }

@@ -1,23 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
-const ADMIN_KEY = "isJzOwner";
+import useSWR from "swr";
 
 export function useAdmin() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { data } = useSWR<{ isAdmin: boolean }>("/api/auth/me", (url: string) =>
+    fetch(url).then((res) => res.json())
+  );
 
-  useEffect(() => {
-    setIsAdmin(localStorage.getItem(ADMIN_KEY) === "true");
-
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === ADMIN_KEY) {
-        setIsAdmin(e.newValue === "true");
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  return isAdmin;
+  return !!data?.isAdmin;
 }

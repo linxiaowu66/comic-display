@@ -30,6 +30,10 @@ export interface SharedProject {
   name: string;
   projectId: number;
   source?: "storyboard" | "material";
+  token?: string;
+  fragmentId?: number;
+  userId?: number;
+  isShared?: boolean;
 }
 
 export interface AppUser {
@@ -47,14 +51,26 @@ export interface LoginRecord {
 }
 
 // --- In-memory fallback (used when BLOB_READ_WRITE_TOKEN is not set) ---
+// Use globalThis to persist in-memory data across hot reloads in Next.js dev mode
+const globalAny = globalThis as any;
 
-const memSharedProjects: SharedProject[] = [];
-const memUsers: AppUser[] = [];
-const memLoginRecords: LoginRecord[] = [];
-const memSeriesCache = new Map<number, unknown[]>();
-const memCharactersCache = new Map<number, unknown[]>();
-const memStoryboardCache = new Map<number, unknown[]>();
-const memMaterialCache = new Map<string, unknown[]>();
+if (!globalAny.memSharedProjects) {
+  globalAny.memSharedProjects = [];
+  globalAny.memUsers = [];
+  globalAny.memLoginRecords = [];
+  globalAny.memSeriesCache = new Map<number, unknown[]>();
+  globalAny.memCharactersCache = new Map<number, unknown[]>();
+  globalAny.memStoryboardCache = new Map<number, unknown[]>();
+  globalAny.memMaterialCache = new Map<string, unknown[]>();
+}
+
+const memSharedProjects: SharedProject[] = globalAny.memSharedProjects;
+const memUsers: AppUser[] = globalAny.memUsers;
+const memLoginRecords: LoginRecord[] = globalAny.memLoginRecords;
+const memSeriesCache: Map<number, unknown[]> = globalAny.memSeriesCache;
+const memCharactersCache: Map<number, unknown[]> = globalAny.memCharactersCache;
+const memStoryboardCache: Map<number, unknown[]> = globalAny.memStoryboardCache;
+const memMaterialCache: Map<string, unknown[]> = globalAny.memMaterialCache;
 
 // --- Shared Projects ---
 

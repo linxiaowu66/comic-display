@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import { type Project } from "@/lib/config";
-import { getStoredProjects } from "@/lib/storage";
 import { useAdmin } from "@/lib/hooks/use-admin";
 
 export interface SeriesItem {
@@ -49,84 +48,80 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const isAdmin = useAdmin();
 
+  async function loadProjects() {
+    try {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      const loadedProjects: Project[] = (data.projects ?? []).map(
+        (p: any) => ({
+          id: p.id,
+          name: p.name,
+          projectId: p.projectId,
+          token: p.token || "",
+          source: p.source ?? "storyboard",
+          fragmentId: p.fragmentId,
+          userId: p.userId,
+          isShared: p.isShared,
+        }),
+      );
+      setAvailableProjects(loadedProjects);
+      if (loadedProjects.length > 0) {
+        // preserve current project selection if it still exists
+        const match = currentProject
+          ? loadedProjects.find((p) => p.projectId === currentProject.projectId)
+          : null;
+        if (!match && !currentProject) {
+          setCurrentProject(loadedProjects[0]);
+        } else if (match) {
+          setCurrentProject(match);
+        } else if (loadedProjects.length > 0) {
+          setCurrentProject(loadedProjects[0]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load projects:", err);
+      setAvailableProjects([]);
+    } finally {
+      setIsInitialized(true);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      if (isAdmin) {
-        const storedProjects = getStoredProjects();
+      try {
+        const res = await fetch("/api/projects");
+        const data = await res.json();
         if (cancelled) return;
-        setAvailableProjects(storedProjects);
-        if (storedProjects.length > 0) {
-          const match = currentProject
-            ? storedProjects.find((p) => p.projectId === currentProject.projectId)
-            : null;
-          setCurrentProject(match ?? storedProjects[0]);
+        
+        const loadedProjects: Project[] = (data.projects ?? []).map(
+          (p: any) => ({
+            id: p.id,
+            name: p.name,
+            projectId: p.projectId,
+            token: p.token || "",
+            source: p.source ?? "storyboard",
+            fragmentId: p.fragmentId,
+            userId: p.userId,
+            isShared: p.isShared,
+          }),
+        );
+        setAvailableProjects(loadedProjects);
+        if (loadedProjects.length > 0 && !currentProject) {
+          setCurrentProject(loadedProjects[0]);
         }
-      } else {
-        try {
-          const res = await fetch("/api/share");
-          const data = await res.json();
-          // If isAdmin became true while fetching, discard this stale result.
-          if (cancelled) return;
-          const sharedProjects: Project[] = (data.projects ?? []).map(
-            (p: { id: string; name: string; projectId: number; source?: "storyboard" | "material" }) => ({
-              id: p.id,
-              name: p.name,
-              projectId: p.projectId,
-              token: "",
-              source: p.source ?? "storyboard",
-            }),
-          );
-          setAvailableProjects(sharedProjects);
-          if (!currentProject && sharedProjects.length > 0) {
-            setCurrentProject(sharedProjects[0]);
-          }
-        } catch {
-          if (!cancelled) setAvailableProjects([]);
-        }
+      } catch (err) {
+        if (!cancelled) setAvailableProjects([]);
       }
       if (!cancelled) setIsInitialized(true);
     }
 
+    // Since isAdmin state could change (e.g., initial SWR load), reloading is fine
     load();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
-
-  async function loadProjects() {
-    if (isAdmin) {
-      const storedProjects = getStoredProjects();
-      setAvailableProjects(storedProjects);
-      if (storedProjects.length > 0) {
-        const match = currentProject
-          ? storedProjects.find((p) => p.projectId === currentProject.projectId)
-          : null;
-        setCurrentProject(match ?? storedProjects[0]);
-      }
-    } else {
-      try {
-        const res = await fetch("/api/share");
-        const data = await res.json();
-        const sharedProjects: Project[] = (data.projects ?? []).map(
-          (p: { id: string; name: string; projectId: number; source?: "storyboard" | "material" }) => ({
-            id: p.id,
-            name: p.name,
-            projectId: p.projectId,
-            token: "",
-            source: p.source ?? "storyboard",
-          }),
-        );
-        setAvailableProjects(sharedProjects);
-        if (!currentProject && sharedProjects.length > 0) {
-          setCurrentProject(sharedProjects[0]);
-        }
-      } catch {
-        setAvailableProjects([]);
-      }
-    }
-    setIsInitialized(true);
-  }
 
   function handleSetProject(project: Project) {
     setCurrentProject(project);

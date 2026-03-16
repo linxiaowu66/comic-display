@@ -284,6 +284,7 @@ function MaterialList() {
             },
             apiHost: MATERIAL_API_HOST,
           },
+          `/api/cache?type=material&id=${cacheKey}`
         ]
       : null,
     apiFetcher,
@@ -298,7 +299,7 @@ function MaterialList() {
   );
 
   const materialListRaw: MaterialItem[] = isAdmin
-    ? (apiData?.data?.list ?? [])
+    ? (apiData?.data?.list ?? (apiData as any)?.data ?? [])
     : (cacheData?.data ?? []);
 
   // Admin: write fetched data to server cache for non-admin access
@@ -744,6 +745,7 @@ function StoryboardList() {
                 size: 500,
               },
             },
+            `/api/cache?type=storyboard&id=${selectedSeries.id}`
           ]
         : `/api/cache?type=storyboard&id=${selectedSeries.id}`
       : null,
@@ -751,7 +753,7 @@ function StoryboardList() {
   );
 
   const storyboardListRaw: StoryboardItem[] = isAdmin
-    ? ((storyboardData as StoryboardResponse)?.result?.list ?? [])
+    ? ((storyboardData as StoryboardResponse)?.result?.list ?? (storyboardData as { data: StoryboardItem[] })?.data ?? [])
     : ((storyboardData as { data: StoryboardItem[] })?.data ?? []);
 
   // Admin: cache storyboard data to server

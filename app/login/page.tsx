@@ -31,13 +31,7 @@ export default function LoginPage() {
       if (res.ok) {
         const data = await res.json();
         
-        // Save admin status locally for client-side UI rendering
-        if (data.isAdmin) {
-          localStorage.setItem("isJzOwner", "true");
-        } else {
-          localStorage.removeItem("isJzOwner");
-        }
-
+        // Admin state is now handled via /api/auth/me which checks session cookie
         toast({
           title: "登录成功",
           description: "欢迎来到漫剧展示",

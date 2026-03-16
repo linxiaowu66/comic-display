@@ -23,6 +23,7 @@ export function useCharacters(
                 type: 1,
               },
             },
+            `/api/cache?type=characters&id=${projectId}`
           ]
         : `/api/cache?type=characters&id=${projectId}`
       : null,
@@ -32,7 +33,7 @@ export function useCharacters(
   );
 
   const characters: Character[] = isAdmin
-    ? (data as CharacterLibraryResponse)?.result?.characters ?? []
+    ? (data as CharacterLibraryResponse)?.result?.characters ?? (data as { data: Character[] })?.data ?? []
     : (data as { data: Character[] })?.data ?? [];
 
   const characterMap = new Map(characters.map((char) => [char.id, char]));

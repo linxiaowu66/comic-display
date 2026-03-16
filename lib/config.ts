@@ -9,6 +9,7 @@ export interface Project {
   source?: "storyboard" | "material";
   fragmentId?: number;
   userId?: number;
+  isShared?: boolean;
 }
 
 // 默认项目配置（示例）

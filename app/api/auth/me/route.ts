@@ -9,5 +9,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json({ username: session.value });
+  const username = session.value;
+  const isAdmin = username === (process.env.ADMIN_USERNAME || "admin");
+
+  return NextResponse.json({ username, isAdmin });
 }
