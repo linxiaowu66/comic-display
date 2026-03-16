@@ -6,7 +6,8 @@ const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN;
 
 async function blobGet<T>(pathname: string, fallback: T): Promise<T> {
   try {
-    const result = await get(pathname, { access: "private" });
+    // Cast options to any to bypass TS complaining about useCache: false (which prevents Vercel edge caching)
+    const result = await get(pathname, { access: "private", useCache: false } as any);
     if (!result || result.statusCode !== 200) return fallback;
     const text = await new Response(result.stream).text();
     return JSON.parse(text) as T;
@@ -84,14 +85,29 @@ export async function addSharedProject(project: SharedProject): Promise<void> {
     const idx = memSharedProjects.findIndex(
       (p) => p.projectId === project.projectId,
     );
-    if (idx !== -1) memSharedProjects[idx] = project;
-    else memSharedProjects.push(project);
+    if (idx !== -1) {
+      const oldProject = memSharedProjects[idx];
+      memSharedProjects[idx] = { ...oldProject, ...project };
+      if (!project.token && oldProject.token) {
+        memSharedProjects[idx].token = oldProject.token;
+      }
+    } else {
+      memSharedProjects.push(project);
+    }
     return;
   }
+  
   const projects = await getSharedProjects();
   const idx = projects.findIndex((p) => p.projectId === project.projectId);
-  if (idx !== -1) projects[idx] = project;
-  else projects.push(project);
+  if (idx !== -1) {
+    const oldProject = projects[idx];
+    projects[idx] = { ...oldProject, ...project };
+    if (!project.token && oldProject.token) {
+      projects[idx].token = oldProject.token;
+    }
+  } else {
+    projects.push(project);
+  }
   await blobPut("shared-projects.json", projects);
 }
 
